@@ -1,20 +1,22 @@
-
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-import IPython
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 import tensorflow as tf
 import time
-from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
-from keras import models, layers
-import pandas as pd
 from tqdm.auto import tqdm
-
+from sklearn.model_selection import train_test_split
+from keras import callbacks
+import time
 from models.lenet import LeNetModel
 from models.resnet50 import ResNetModel
+from models.cnn import CNNModel
+
+BATCH_SIZE = 500
+EPOCHS = 50
 
 # Load data
 train_file_path = '../../../../mnt/sda/suhohan/emnist/emnist-byclass-train.csv'
@@ -26,41 +28,107 @@ train_data = pd.concat([chunk for chunk in tqdm(train_data_iter, desc='Loading t
 test_data_iter = pd.read_csv(test_file_path, chunksize=chunk_size)
 test_data = pd.concat([chunk for chunk in tqdm(test_data_iter, desc='Loading test data')])
 
-print(train_data.shape, test_data.shape)
-
-# 데이터의 차원과 크기를 정확히 파악
+# Data dimensions and sizes
 num_train_samples = train_data.shape[0]
 num_test_samples = test_data.shape[0]
 
-# 데이터 준비
+# Prepare data
 x_train = train_data.iloc[:, 1:].to_numpy().reshape((num_train_samples, 28, 28, 1))
 x_test = test_data.iloc[:, 1:].to_numpy().reshape((num_test_samples, 28, 28, 1))
-y_train = tf.keras.utils.to_categorical(train_data.iloc[:, 0], 62)  # 클래스 수는 EMNIST ByClass 기준 62개
+y_train = tf.keras.utils.to_categorical(train_data.iloc[:, 0], 62)  # 62 classes for EMNIST ByClass
 y_test = tf.keras.utils.to_categorical(test_data.iloc[:, 0], 62)
 
-# ResNet을 위한 데이터 준비
+# Integer labels for sparse categorical crossentropy
+y_train_int = train_data.iloc[:, 0].to_numpy()
+y_test_int = test_data.iloc[:, 0].to_numpy()
+
+# Split the training data into training and validation sets
+_, _, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.1, random_state=42)
+x_train, x_valid, y_train_int, y_valid_int = train_test_split(x_train, y_train_int, test_size=0.1, random_state=42)
+
+# Prepare data for ResNet
 x_train_resized = tf.image.resize(x_train, [32, 32])
+x_valid_resized = tf.image.resize(x_valid, [32, 32])
 x_test_resized = tf.image.resize(x_test, [32, 32])
 x_train_rgb = tf.repeat(x_train_resized, 3, axis=3)
+x_valid_rgb = tf.repeat(x_valid_resized, 3, axis=3)
 x_test_rgb = tf.repeat(x_test_resized, 3, axis=3)
 
-# 콜백 설정
-checkpoint_path_lenet = f"./checkpoints_lenet/weights.{time.time()}.hdf5"
-checkpoint_path_resnet = f"./checkpoints_resnet/weights.{time.time()}.hdf5"
+# Callbacks for checkpoints and learning rate reduction
+checkpoint_path_lenet = f"./checkpoints_lenet/weights.{int(time.time())}.hdf5"
+checkpoint_path_resnet = f"./checkpoints_resnet/weights.{int(time.time())}.hdf5"
+checkpoint_path_cnn = f"./checkpoints_cnn/weights.{int(time.time())}.hdf5"
+reduce_lr = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=0.000001)
 
-
-# 모델 생성 및 훈련
+# Initialize models
 lenet_model = LeNetModel()
 resnet_model = ResNetModel()
-lenet_model.compile()
-resnet_model.compile()
-lenet_model.train(x_train, y_train, validation_data=(x_test, y_test), batch_size=1000)
-resnet_model.train(x_train_rgb, y_train, validation_data=(x_test_rgb, y_test), batch_size=1000)
+cnn_model = CNNModel()
 
-# 모델 평가
-loss_lenet, acc_lenet = lenet_model.evaluate(x_test, y_test)
-loss_resnet, acc_resnet = resnet_model.evaluate(x_test_rgb, y_test)
+# Compile models
+lenet_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+resnet_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+cnn_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-# 결과 표시
-results = {"Model": ["LeNet-5", "ResNet-50"], "Loss": [loss_lenet, loss_resnet], "Accuracy": [acc_lenet, acc_resnet]}
+# Train models
+history = []
+training_time=[]
+
+start_time = time.time()
+history.append(lenet_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE,))
+end_time = time.time()
+training_time.append(end_time-start_time)
+
+start_time = time.time()
+history.append(resnet_model.train(x_train_rgb, y_train_int, validation_data=(x_valid_rgb, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE,))
+end_time = time.time()
+training_time.append(end_time-start_time)
+
+start_time = time.time()
+history.append(cnn_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr]))
+end_time = time.time()
+training_time.append(end_time-start_time)
+
+# Evaluate models
+loss_lenet, acc_lenet = lenet_model.evaluate(x_test, y_test_int)
+loss_resnet, acc_resnet = resnet_model.evaluate(x_test_rgb, y_test_int)
+loss_cnn, acc_cnn = cnn_model.evaluate(x_test, y_test_int)
+
+# Results DataFrame
+results = {
+    "Model": ["LeNet-5", "ResNet-50", "CNN"],
+    "Loss": [loss_lenet, loss_resnet, loss_cnn],
+    "Accuracy": [acc_lenet, acc_resnet, acc_cnn],
+    "Training Time": training_time
+}
+result_path = './results'
 results_df = pd.DataFrame(results)
+results_df.to_csv(f'{result_path}/result{time.time()}.csv', index=False)
+
+colors = ["red", "blue", "green"]
+
+plt.figure(figsize=(10, 5))
+
+plt.subplot(121)
+for idx, hist in enumerate(history):
+    plt.plot(hist.history['loss'], label=f'{results["Model"][idx]}', color=colors[idx])
+    plt.title(f'Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.xlim([0, EPOCHS])
+    plt.grid(True)
+    plt.legend()
+plt.subplot(122)
+for idx, hist in enumerate(history):
+    plt.plot(hist.history['accuracy'], label=f'{results["Model"][idx]}', color=colors[idx])
+    plt.title(f'Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.xlim([0, EPOCHS])
+    plt.ylim([0, 1])
+    plt.grid(True)
+    plt.legend()
+
+plt.tight_layout()
+plt.show()
+plt.savefig(f"{result_path}/result{time.time()}.png")
