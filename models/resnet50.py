@@ -10,7 +10,7 @@ class ResNetModel:
         self.model = self.build_model()
 
     def build_model(self):
-        input_tensor = Input(shape=(32, 32, 3))
+        input_tensor = Input(shape=(32, 32, 1))
         base_model = ResNet50(weights=None, include_top=False, input_tensor=input_tensor)
         x = GlobalAveragePooling2D()(base_model.output)
         x = Dense(1024, activation='relu')(x)

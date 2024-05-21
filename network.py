@@ -13,7 +13,7 @@ from keras import callbacks
 import time
 from models.lenet import LeNetModel
 from models.resnet50 import ResNetModel
-from models.cnn import CNNModel
+from models.ours import CNNModel
 
 BATCH_SIZE = 500
 EPOCHS = 50
@@ -50,15 +50,15 @@ x_train, x_valid, y_train_int, y_valid_int = train_test_split(x_train, y_train_i
 x_train_resized = tf.image.resize(x_train, [32, 32])
 x_valid_resized = tf.image.resize(x_valid, [32, 32])
 x_test_resized = tf.image.resize(x_test, [32, 32])
-x_train_rgb = tf.repeat(x_train_resized, 3, axis=3)
-x_valid_rgb = tf.repeat(x_valid_resized, 3, axis=3)
-x_test_rgb = tf.repeat(x_test_resized, 3, axis=3)
 
 # Callbacks for checkpoints and learning rate reduction
 checkpoint_path_lenet = f"./checkpoints_lenet/weights.{int(time.time())}.hdf5"
 checkpoint_path_resnet = f"./checkpoints_resnet/weights.{int(time.time())}.hdf5"
 checkpoint_path_cnn = f"./checkpoints_cnn/weights.{int(time.time())}.hdf5"
 reduce_lr = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=0.000001)
+checkpoint_lenet = callbacks.ModelCheckpoint(filepath=checkpoint_path_lenet, monitor='val_loss', save_best_only=True, verbose=1)
+checkpoint_resnet = callbacks.ModelCheckpoint(filepath=checkpoint_path_resnet, monitor='val_loss', save_best_only=True, verbose=1)
+checkpoint_cnn = callbacks.ModelCheckpoint(filepath=checkpoint_path_cnn, monitor='val_loss', save_best_only=True, verbose=1)
 
 # Initialize models
 lenet_model = LeNetModel()
@@ -75,23 +75,24 @@ history = []
 training_time=[]
 
 start_time = time.time()
-history.append(lenet_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE,))
+history.append(lenet_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_lenet]))
 end_time = time.time()
 training_time.append(end_time-start_time)
 
 start_time = time.time()
-history.append(resnet_model.train(x_train_rgb, y_train_int, validation_data=(x_valid_rgb, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE,))
+history.append(resnet_model.train(x_train_resized, y_train_int, validation_data=(x_valid_resized, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_resnet]))
 end_time = time.time()
 training_time.append(end_time-start_time)
 
 start_time = time.time()
-history.append(cnn_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr]))
+history.append(cnn_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_cnn]))
 end_time = time.time()
 training_time.append(end_time-start_time)
+
 
 # Evaluate models
 loss_lenet, acc_lenet = lenet_model.evaluate(x_test, y_test_int)
-loss_resnet, acc_resnet = resnet_model.evaluate(x_test_rgb, y_test_int)
+loss_resnet, acc_resnet = resnet_model.evaluate(x_test, y_test_int)
 loss_cnn, acc_cnn = cnn_model.evaluate(x_test, y_test_int)
 
 # Results DataFrame

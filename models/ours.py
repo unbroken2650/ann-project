@@ -3,7 +3,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from keras import models, layers,optimizers, callbacks
 
 
-class CNNModel:
+class OurModel:
     def __init__(self):
         self.model = self.build_model()
         
