@@ -1,24 +1,24 @@
 from keras import models, layers
-from keras.applications import ResNet50
-from keras.models import Model
-from keras.layers import Dense, GlobalAveragePooling2D, Input
 
-class ResNetModel:
+class CNNModel:
     def __init__(self):
         self.model = self.build_model()
 
     def build_model(self):
-        input_tensor = Input(shape=(32, 32, 1))
-        base_model = ResNet50(weights=None, include_top=False, input_tensor=input_tensor)
-        x = GlobalAveragePooling2D()(base_model.output)
-        x = Dense(1024, activation='relu')(x)
-        output = Dense(62, activation='softmax')(x)
-        model = Model(inputs=base_model.input, outputs=output)
+        model = models.Sequential([
+            layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
+            layers.MaxPooling2D((2, 2)),
+            layers.Conv2D(64, (3, 3), activation='relu'),
+            layers.MaxPooling2D((2, 2)),
+            layers.Conv2D(64, (3, 3), activation='relu'),
+            layers.Flatten(),
+            layers.Dense(64, activation='relu'),
+            layers.Dense(62, activation='softmax')  # 47 classes in EMNIST Balanced
+        ])
         return model
-    
+
     def compile(self, optimizer, loss, metrics):
         self.model.compile(optimizer, loss, metrics)
-
 
     def train(self, x_train, y_train, validation_data, epochs=50, batch_size=300, callbacks=None, class_weight=None):
         return self.model.fit(x_train, y_train, validation_data=validation_data, batch_size=batch_size, epochs=epochs, callbacks=callbacks, class_weight=class_weight)

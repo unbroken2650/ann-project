@@ -1,19 +1,18 @@
+from models.residual import CNNModel
+from models.resnet50 import ResNetModel
+from models.lenet import LeNetModel
+from keras import callbacks
+from sklearn.model_selection import train_test_split
+from tqdm.auto import tqdm
+import time
+import tensorflow as tf
+from PIL import Image
+import matplotlib.pyplot as plt
+import pandas as pd
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-import pandas as pd
-import matplotlib.pyplot as plt
-from PIL import Image
-import tensorflow as tf
-import time
-from tqdm.auto import tqdm
-from sklearn.model_selection import train_test_split
-from keras import callbacks
-import time
-from models.lenet import LeNetModel
-from models.resnet50 import ResNetModel
-from models.ours import CNNModel
 
 BATCH_SIZE = 500
 EPOCHS = 50
@@ -56,9 +55,12 @@ checkpoint_path_lenet = f"./checkpoints_lenet/weights.{int(time.time())}.hdf5"
 checkpoint_path_resnet = f"./checkpoints_resnet/weights.{int(time.time())}.hdf5"
 checkpoint_path_cnn = f"./checkpoints_cnn/weights.{int(time.time())}.hdf5"
 reduce_lr = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=0.000001)
-checkpoint_lenet = callbacks.ModelCheckpoint(filepath=checkpoint_path_lenet, monitor='val_loss', save_best_only=True, verbose=1)
-checkpoint_resnet = callbacks.ModelCheckpoint(filepath=checkpoint_path_resnet, monitor='val_loss', save_best_only=True, verbose=1)
-checkpoint_cnn = callbacks.ModelCheckpoint(filepath=checkpoint_path_cnn, monitor='val_loss', save_best_only=True, verbose=1)
+checkpoint_lenet = callbacks.ModelCheckpoint(
+    filepath=checkpoint_path_lenet, monitor='val_loss', save_best_only=True, verbose=1)
+checkpoint_resnet = callbacks.ModelCheckpoint(
+    filepath=checkpoint_path_resnet, monitor='val_loss', save_best_only=True, verbose=1)
+checkpoint_cnn = callbacks.ModelCheckpoint(
+    filepath=checkpoint_path_cnn, monitor='val_loss', save_best_only=True, verbose=1)
 
 # Initialize models
 lenet_model = LeNetModel()
@@ -72,20 +74,23 @@ cnn_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metr
 
 # Train models
 history = []
-training_time=[]
+training_time = []
 
 start_time = time.time()
-history.append(lenet_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_lenet]))
+history.append(lenet_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int),
+               epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_lenet]))
 end_time = time.time()
 training_time.append(end_time-start_time)
 
 start_time = time.time()
-history.append(resnet_model.train(x_train_resized, y_train_int, validation_data=(x_valid_resized, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_resnet]))
+history.append(resnet_model.train(x_train_resized, y_train_int, validation_data=(x_valid_resized,
+               y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_resnet]))
 end_time = time.time()
 training_time.append(end_time-start_time)
 
 start_time = time.time()
-history.append(cnn_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int), epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_cnn]))
+history.append(cnn_model.train(x_train, y_train_int, validation_data=(x_valid, y_valid_int),
+               epochs=EPOCHS, batch_size=BATCH_SIZE, callbacks=[reduce_lr, checkpoint_cnn]))
 end_time = time.time()
 training_time.append(end_time-start_time)
 

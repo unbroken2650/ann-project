@@ -1,5 +1,3 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from keras import models, layers
 
 class LeNetModel:
@@ -23,8 +21,11 @@ class LeNetModel:
     def compile(self, optimizer, loss, metrics):
         self.model.compile(optimizer, loss, metrics)
 
-    def train(self, x_train, y_train, validation_data, epochs=50, batch_size=300, callbacks=None):
-        return self.model.fit(x_train, y_train, validation_data=validation_data, batch_size=batch_size, epochs=epochs, callbacks=callbacks)
+    def train(self, x_train, y_train, validation_data, epochs=50, batch_size=300, callbacks=None, class_weight=None):
+        return self.model.fit(x_train, y_train, validation_data=validation_data, batch_size=batch_size, epochs=epochs, callbacks=callbacks, class_weight=class_weight)
 
     def evaluate(self, x_test, y_test):
         return self.model.evaluate(x_test, y_test)
+    
+    def summary(self):
+            return self.model.summary()
