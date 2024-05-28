@@ -1,4 +1,4 @@
-/checkpoints
+checkpoints/
 models/__pycache__
 
 # Byte-compiled / optimized / DLL files
