@@ -83,7 +83,7 @@ best_activation = layers.Activation('swish')
 best_learning_rate = 2e-4
 best_optimizer = optimizers.legacy.Nadam(learning_rate=best_learning_rate, beta_1=0.9, beta_2=0.999)
 
-results = {'Loss Function': ['Cross Entropy Loss', 'Focal Loss'], 'Loss': [], 'Accuracy': [], 'Training Time': []}
+results = {'Loss Function': ['Cross Entropy Loss'], 'Loss': [], 'Accuracy': [], 'Training Time': []}
 
 EPOCHS = 50
 BATCH_SIZE = 500
@@ -112,15 +112,11 @@ class CategoricalFocalLoss(losses.Loss):
         return tf.reduce_mean(loss)
 
 
-focal_loss = CategoricalFocalLoss(gamma=2.0, alpha=0.25)
-
 model_default = ResModel(num_residual_units=3, activation=best_activation)
-model_focal = ResModel(num_residual_units=3, activation=best_activation)
 model_default.compile(optimizer=best_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-model_focal.compile(optimizer=best_optimizer, loss=focal_loss, metrics=['accuracy'])
 
 
-def _train_losses(model, x_train, y_train, validation_data, x_test, y_test):
+def _train_losses(model, x_train, y_train, validation_data, x_test, y_test, gamma, alpha):
     start_time = time.time()
     hist = model.train(x_train, y_train, validation_data=validation_data, epochs=EPOCHS,
                        batch_size=BATCH_SIZE, callbacks=[callbacks_final])
@@ -129,13 +125,20 @@ def _train_losses(model, x_train, y_train, validation_data, x_test, y_test):
     history.append(hist)
 
     loss, accuracy = model.evaluate(x_test, y_test)
+    results['Loss Function'].append(f'Focal_g={gamma}_a={alpha}')
     results['Loss'].append(loss)
     results['Accuracy'].append(accuracy)
     results['Training Time'].append(end_time - start_time)
 
 
 _train_losses(model_default, x_train, y_train_int, (x_valid, y_valid_int), x_test, y_test_int)
-_train_losses(model_focal, x_train, y_train, (x_valid, y_valid), x_test, y_test)
+
+for alpha, gamma in zip([0.15, 0.25, 0.35], [0.5, 0.75, 1]):
+    focal_loss = CategoricalFocalLoss(gamma=gamma, alpha=alpha)
+    model_focal = ResModel(num_residual_units=3, activation=best_activation)
+    model_focal.compile(optimizer=best_optimizer, loss=focal_loss, metrics=['accuracy'])
+    _train_losses(model_focal, x_train, y_train, (x_valid, y_valid), x_test, y_test, gamma, alpha)
+
 
 results_df = pd.DataFrame(results)
 results_df.to_csv(f'{result_path}/result_losses_{_time}.csv', index=False)
@@ -175,11 +178,11 @@ plt.show()
 
 metrics = ["Loss", "Accuracy", "Training Time"]
 for metric in metrics:
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(20, 7))
     sns.barplot(x="Loss Function", y=metric, hue="Loss Function", data=results_df, palette="viridis", legend=False)
     plt.title(f'{metric} Comparison')
     plt.ylabel(metric)
     plt.xlabel('Loss Function')
     plt.tight_layout()
-    plt.savefig(f'{result_path}/{metric.lower().replace(" ", "_")}_comparison_lr_{_time}.png')
+    plt.savefig(f'{result_path}/{metric.lower().replace(" ", "_")}_comparison_losses_{_time}.png')
     plt.show()

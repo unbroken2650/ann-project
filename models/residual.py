@@ -54,8 +54,8 @@ class ResModel:
         return model
 
     def _get_activation(self):
-        if self.activation == 'leaky_relu':
-            return layers.LeakyReLU()
+        if self.activation == 'swish':
+            return layers.Activation('swish')
         elif self.activation == 'prelu':
             return layers.PReLU(shared_axes=[1, 2])
         else:
