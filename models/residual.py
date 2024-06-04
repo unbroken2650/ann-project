@@ -72,5 +72,8 @@ class ResModel:
     def evaluate(self, x_test, y_test):
         return self.model.evaluate(x_test, y_test)
 
+    def predict(self, x_test):
+        return self.model.predict(x_test)
+
     def summary(self):
         return self.model.summary()
